@@ -1,6 +1,9 @@
 import { View, Text } from "react-native";
 
 export default function App() {
+  console.log("App Exectued")
+  let x = 1;
+  x.toString()
   return (
     <View
       style={{
@@ -9,7 +12,7 @@ export default function App() {
         alignItems: "center",
       }}
     >
-      <Text>Universal React with Expo</Text>
+      <Text>Universal Omer React with Expo</Text>
     </View>
   );
 }
