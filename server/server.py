@@ -1,3 +1,9 @@
+from flask import Flask, render_template, request
+from werkzeug.utils import secure_filename
+
+
+
+
 '''
     Text detection model: https://github.com/argman/EAST
     Download link: https://www.dropbox.com/s/r2ingd0l3zt8hxs/frozen_east_text_detection.tar.gz?dl=1
@@ -15,32 +21,9 @@
     torch.onnx.export(model, dummy_input, "crnn.onnx", verbose=True)
 '''
 
-import numpy as np
-import cv2 as cv
+import numpy as np # numjs
+import cv2 as cv # opencv-js
 import math
-import argparse
-############ Add argument parser for command line arguments ############
-parser = argparse.ArgumentParser(
-    description="Use this script to run TensorFlow implementation (https://github.com/argman/EAST) of "
-                "EAST: An Efficient and Accurate Scene Text Detector (https://arxiv.org/abs/1704.03155v2)"
-                "The OCR model can be obtained from converting the pretrained CRNN model to .onnx format from the github repository https://github.com/meijieru/crnn.pytorch"
-                "Or you can download trained OCR model directly from https://drive.google.com/drive/folders/1cTbQ3nuZG-EKWak6emD_s8_hHXWz7lAr?usp=sharing")
-parser.add_argument('--input',
-                    help='Path to input image or video file. Skip this argument to capture frames from a camera.')
-parser.add_argument('--model', '-m', required=True,
-                    help='Path to a binary .pb file contains trained detector network.')
-parser.add_argument('--ocr', default="crnn.onnx",
-                    help="Path to a binary .pb or .onnx file contains trained recognition network", )
-parser.add_argument('--width', type=int, default=320,
-                    help='Preprocess input image by resizing to a specific width. It should be multiple by 32.')
-parser.add_argument('--height', type=int, default=320,
-                    help='Preprocess input image by resizing to a specific height. It should be multiple by 32.')
-parser.add_argument('--thr', type=float, default=0.5,
-                    help='Confidence threshold.')
-parser.add_argument('--nms', type=float, default=0.4,
-                    help='Non-maximum suppression threshold.')
-args = parser.parse_args()
-
 
 ############ Utility functions ############
 
@@ -135,12 +118,12 @@ def decodeBoundingBoxes(scores, geometry, scoreThresh):
 
 def main():
     # Read and store arguments
-    confThreshold = args.thr
-    nmsThreshold = args.nms
-    inpWidth = args.width
-    inpHeight = args.height
-    modelDetector = args.model
-    modelRecognition = args.ocr
+    confThreshold = 0.5
+    nmsThreshold = 0.4
+    inpWidth = 320
+    inpHeight = 320
+    modelDetector = "frozen_east_text_detection.pb"
+    modelRecognition = "ResNet_CTC.onnx"
     # Load network
     detector = cv.dnn.readNet(modelDetector)
     recognizer = cv.dnn.readNet(modelRecognition)
@@ -152,7 +135,7 @@ def main():
     outNames.append("feature_fusion/Conv_7/Sigmoid")
     outNames.append("feature_fusion/concat_3")
     # Open a video file or an image file or a camera stream
-    cap = cv.VideoCapture(args.input if args.input else 0)
+    cap = cv.VideoCapture("file.img1")
 
     tickmeter = cv.TickMeter()
     while cv.waitKey(1) < 0:
@@ -220,17 +203,36 @@ def main():
                 p1 = (int(vertices[j][0]), int(vertices[j][1]))
                 p2 = (int(vertices[(j + 1) % 4][0]),
                       int(vertices[(j + 1) % 4][1]))
-                cv.line(frame, p1, p2, (0, 255, 0), 1)
+                cv.line(frame, p1, p2, (0, 255, 0), 10)
 
         # Put efficiency information
         label = 'Inference time: %.2f ms' % (tickmeter.getTimeMilli())
         cv.putText(frame, label, (0, 15),
-                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+                   cv.FONT_HERSHEY_SIMPLEX, 14, (0, 255, 0))
 
         # Display the frame
         cv.imshow(kWinName, frame)
         tickmeter.reset()
 
 
+
+
+
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello_world():
+    return "<p>Hello, World!</p>"
+	
+@app.route('/uploader', methods = ['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        f = request.files['image']
+        f.save("file.img1")
+        main()
+        return '21.12.2022'
+		
+
 if __name__ == "__main__":
-    main()
+    app.run(debug=True, host="0.0.0.0")

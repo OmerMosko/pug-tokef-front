@@ -15,13 +15,13 @@ export default function App() {
   const [photo, setPhoto] = useState();
   const listAllVoiceOptions = async () => {
     let voices = await Speech.getAvailableVoicesAsync();
-    console.log(voices);
+    // console.log(voices);
   };
   
   React.useEffect(listAllVoiceOptions);
    // Speech 
    const speakGreeting = (name) => {
-    const greeting = `21/11/2022`;
+    var greeting = name;
     const options = {
       voice: "com.apple.speech.synthesis.voice.Fred",
     };
@@ -63,8 +63,29 @@ export default function App() {
 
     let savePhoto = () => {
       MediaLibrary.saveToLibraryAsync(photo.uri).then(() => {
+        const form = new FormData();
+
+        form.append('image', {
+          uri: photo.uri,
+          type: 'image/jpg',
+          name: 'image.jpg',
+        });
+
+        fetch('http://10.100.102.24:5000/uploader', {
+          method: 'POST',
+          headers: {
+            contentType: "text/html; charset=utf-8",
+          },
+          body: form
+        })
+        .then((response) => {
+          console.log("recived")
+          console.log(response)
+          speakGreeting(response)
+        }).catch((error)=>{
+          console.error("Failed uploader")
+        });
         setPhoto(undefined);
-        speakGreeting("Hey Roy!");
       });
     };
 
