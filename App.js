@@ -1,8 +1,8 @@
-import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, SafeAreaView, Button, Image } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Camera } from 'expo-camera';
 import { shareAsync } from 'expo-sharing';
+import { Video } from 'expo-av';
 import * as MediaLibrary from 'expo-media-library';
 import * as Speech from 'expo-speech';
 import React from 'react';
@@ -12,29 +12,40 @@ export default function App() {
   let cameraRef = useRef();
   const [hasCameraPermission, setHasCameraPermission] = useState();
   const [hasMediaLibraryPermission, setHasMediaLibraryPermission] = useState();
+  const [hasMicrophonePermission, setHasMicrophonePermission] = useState();
+
   const [photo, setPhoto] = useState();
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [video, setVideo] = useState();
+
   const listAllVoiceOptions = async () => {
     let voices = await Speech.getAvailableVoicesAsync();
     // console.log(voices);
   };
   
   React.useEffect(listAllVoiceOptions);
-   // Speech 
-   const speakGreeting = (name) => {
-    var greeting = name;
+  // Speech 
+  const speakGreeting = (name) => {
+    var greeting = "21.12.2022";
     const options = {
       voice: "com.apple.speech.synthesis.voice.Fred",
     };
     Speech.speak(greeting, options)
-  };
-
+  };  
   useEffect(() => {
     (async () => {
       const cameraPermission = await Camera.requestCameraPermissionsAsync();
-      const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
+      console.log(cameraPermission)
       setHasCameraPermission(cameraPermission.status === "granted");
+      const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
+      console.log(mediaLibraryPermission)
       setHasMediaLibraryPermission(mediaLibraryPermission.status === "granted");
+      const microphonePermission = await Camera.requestMicrophonePermissionsAsync();
+      setHasMicrophonePermission(microphonePermission.status === "granted");
+
     })();
+    
   }, []);
 
   if (hasCameraPermission === undefined) {
@@ -49,10 +60,86 @@ export default function App() {
       base64: true,
       exif: false
     };
+    console.log('Capturing');
 
     let newPhoto = await cameraRef.current.takePictureAsync(options);
     setPhoto(newPhoto);
+    MediaLibrary.saveToLibraryAsync(newPhoto.uri).then(() => {
+      // const form = new FormData();
+
+      // form.append('image', {
+      //   uri: newPhoto.uri,
+      //   type: 'image/jpg',
+      //   name: 'image.jpg',
+      // });
+
+      // fetch('http://10.100.102.24:5000/uploader', {
+      //   method: 'POST',
+      //   headers: {
+      //     co ntentType: "text/html; charset=utf-8",
+      //   },
+      //   body: form
+      // })
+      // .then((response) => {
+      //   console.log("recived")
+      //   console.log(response)
+      //   speakGreeting(response)
+      // }).catch((error)=>{
+      //   console.error("Failed uploader")
+      // });
+      setPhoto(undefined);
+    });
+    
+   
   };
+
+  let recordVideo = () => {
+    setIsRecording(true);
+    let options = {
+      quality: "1080p",
+      maxDuration: 5,
+      mute: false
+    };
+
+    cameraRef.current.recordAsync(options).then((recordedVideo) => {
+      setVideo(recordedVideo);
+      setIsRecording(false);
+    });
+  };
+
+  let stopRecording = () => {
+    setIsRecording(false);
+    cameraRef.current.stopRecording();
+  };
+
+  if (video) {
+    let shareVideo = () => {
+      shareAsync(video.uri).then(() => {
+        setVideo(undefined);
+      });
+    };
+
+    let saveVideo = () => {
+      MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
+        setVideo(undefined);
+      });
+    };
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <Video
+          style={styles.video}
+          source={{uri: video.uri}}
+          useNativeControls
+          resizeMode='contain'
+          isLooping
+        />
+        <Button title="Share" onPress={shareVideo} />
+        {hasMediaLibraryPermission ? <Button title="Save" onPress={saveVideo} /> : undefined}
+        <Button title="Discard" onPress={() => setVideo(undefined)} />
+      </SafeAreaView>
+    );
+  }
 
   if (photo) {
     let sharePic = () => {
@@ -62,52 +149,19 @@ export default function App() {
     };
 
     let savePhoto = () => {
-      MediaLibrary.saveToLibraryAsync(photo.uri).then(() => {
-        const form = new FormData();
-
-        form.append('image', {
-          uri: photo.uri,
-          type: 'image/jpg',
-          name: 'image.jpg',
-        });
-
-        fetch('http://10.100.102.24:5000/uploader', {
-          method: 'POST',
-          headers: {
-            contentType: "text/html; charset=utf-8",
-          },
-          body: form
-        })
-        .then((response) => {
-          console.log("recived")
-          console.log(response)
-          speakGreeting(response)
-        }).catch((error)=>{
-          console.error("Failed uploader")
-        });
-        setPhoto(undefined);
-      });
+      
     };
-
-    return (
-      <SafeAreaView style={styles.container}>
-        <Image style={styles.preview} source={{ uri: "data:image/jpg;base64," + photo.base64 }} />
-        <Button title="Share" onPress={sharePic} />
-        {hasMediaLibraryPermission ? <Button title="Save" onPress={savePhoto} /> : undefined}
-        <Button title="Discard" onPress={() => setPhoto(undefined)} />
-      </SafeAreaView>
-    );
   }
 
- 
-
   return (
-    <Camera style={styles.container} ref={cameraRef}>
+    <>
+    <Camera style={styles.container} ref={cameraRef} onPress={takePic}>
       <View style={styles.buttonContainer}>
-        <Button title="Take Pic" onPress={takePic} />
+          <Button title="TakePic" onPress={takePic} />
+          <Button title={isRecording ? "Stop Recording" : "Record Video"} onPress={isRecording ? stopRecording : recordVideo} />
       </View>
-      <StatusBar style="auto" />
     </Camera>
+    </>
   );
 }
 
@@ -116,20 +170,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: "150%",
   },
   buttonContainer: {
     backgroundColor: '#fff',
-    alignSelf: 'flex-end'
   },
   preview: {
     alignSelf: 'stretch',
-    flex: 1
   },
-  input: {
-    alignSelf: 'stretch',
-    height: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: "red",
-    margin: 8
+  video: {
+    flex: 1,
+    alignSelf: "stretch"
   }
 });

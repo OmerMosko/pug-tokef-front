@@ -14,7 +14,12 @@
     dummy_input = torch.randn(1, 1, 32, 100)
     torch.onnx.export(model, dummy_input, "crnn.onnx", verbose=True)
 '''
-
+import os
+os.add_dll_directory(
+    "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.2/bin")
+from onnx_tf.backend import prepare
+import onnx
+import warnings
 import numpy as np
 import cv2 as cv
 import math
@@ -31,9 +36,9 @@ parser.add_argument('--model', '-m', required=True,
                     help='Path to a binary .pb file contains trained detector network.')
 parser.add_argument('--ocr', default="crnn.onnx",
                     help="Path to a binary .pb or .onnx file contains trained recognition network", )
-parser.add_argument('--width', type=int, default=320,
+parser.add_argument('--width', type=int, default=640,
                     help='Preprocess input image by resizing to a specific width. It should be multiple by 32.')
-parser.add_argument('--height', type=int, default=320,
+parser.add_argument('--height', type=int, default=640,
                     help='Preprocess input image by resizing to a specific height. It should be multiple by 32.')
 parser.add_argument('--thr', type=float, default=0.5,
                     help='Confidence threshold.')
@@ -144,7 +149,10 @@ def main():
     # Load network
     detector = cv.dnn.readNet(modelDetector)
     recognizer = cv.dnn.readNet(modelRecognition)
-
+    # Ignore all the warning messages in this tutorial
+    warnings.filterwarnings('ignore')
+    model = onnx.load('./ResNet_CTC.onnx')  # Load the ONNX file
+    tf_rep = prepare(model,gen_tensor_dict=True)  # Import the ONNX model to Tensorflow
     # Create a new named window
     kWinName = "EAST: An Efficient and Accurate Scene Text Detector"
     cv.namedWindow(kWinName, cv.WINDOW_NORMAL)
@@ -178,7 +186,6 @@ def main():
         tickmeter.start()
         outs = detector.forward(outNames)
         tickmeter.stop()
-
         # Get scores and geometry
         scores = outs[0]
         geometry = outs[1]
@@ -208,11 +215,13 @@ def main():
 
                 # Run the recognition model
                 tickmeter.start()
-                result = recognizer.forward()
+                # result = recognizer.forward()
+                result = tf_rep.run(blob)
                 tickmeter.stop()
 
                 # decode the result into text
-                wordRecognized = decodeText(result)
+                wordRecognized = decodeText(result.output)
+                print(wordRecognized)
                 cv.putText(frame, wordRecognized, (int(vertices[1][0]), int(vertices[1][1])), cv.FONT_HERSHEY_SIMPLEX,
                            0.5, (255, 0, 0))
 
@@ -224,8 +233,9 @@ def main():
 
         # Put efficiency information
         label = 'Inference time: %.2f ms' % (tickmeter.getTimeMilli())
+        print(label)
         cv.putText(frame, label, (0, 15),
-                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+                   cv.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0))
 
         # Display the frame
         cv.imshow(kWinName, frame)
