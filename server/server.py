@@ -2,8 +2,6 @@ from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 
 
-
-
 '''
     Text detection model: https://github.com/argman/EAST
     Download link: https://www.dropbox.com/s/r2ingd0l3zt8hxs/frozen_east_text_detection.tar.gz?dl=1
@@ -134,8 +132,10 @@ def main():
     outNames = []
     outNames.append("feature_fusion/Conv_7/Sigmoid")
     outNames.append("feature_fusion/concat_3")
+
     # Open a video file or an image file or a camera stream
-    cap = cv.VideoCapture("file.img1")
+    #cap = cv.VideoCapture("file.img1")
+    cap = cv.VideoCapture(0)
 
     tickmeter = cv.TickMeter()
     while cv.waitKey(1) < 0:

@@ -160,7 +160,9 @@ def main():
     outNames.append("feature_fusion/Conv_7/Sigmoid")
     outNames.append("feature_fusion/concat_3")
     # Open a video file or an image file or a camera stream
-    cap = cv.VideoCapture(args.input if args.input else 0)
+
+    #cap = cv.VideoCapture(args.input if args.input else 0)
+    cap = cv.VideoCapture(0)
 
     tickmeter = cv.TickMeter()
     while cv.waitKey(1) < 0:
