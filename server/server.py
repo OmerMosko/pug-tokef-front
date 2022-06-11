@@ -174,9 +174,9 @@ def is_date(string, fuzzy=False):
         except ValueError as err:
             return False
 
-def main():
+def main(imput_file):
 
-    cap = cv.VideoCapture(input)
+    cap = cv.VideoCapture(imput_file)
     #cap = cv.VideoCapture(args.input if args.input else 0)
     count = 0
     tickmeter = cv.TickMeter()
@@ -275,10 +275,17 @@ def hello_world():
 def upload_file():
     if request.method == 'POST':
         f = request.files['image']
-        f.save("file.img1")
-        main()
+        f.save("file.jpg")
+        main("file.jpg")
         return '21.12.2022'
-		
+
+@app.route('/uploadervideo', methods = ['GET', 'POST'])
+def upload_video():
+    if request.method == 'POST':
+        f = request.files['image']
+        f.save("file.mp4")
+        main("file.mp4")
+        return '21.12.2022'	
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

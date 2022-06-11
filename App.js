@@ -56,7 +56,7 @@ export default function App() {
 
   let takePic = async () => {
     let options = {
-      quality: 1,
+      quality: 0.5,
       base64: true,
       exif: false
     };
@@ -64,16 +64,57 @@ export default function App() {
 
     let newPhoto = await cameraRef.current.takePictureAsync(options);
     setPhoto(newPhoto);
-    MediaLibrary.saveToLibraryAsync(newPhoto.uri).then(() => {
+  
+    const form = new FormData();
+
+    form.append('image', {
+      uri: newPhoto.uri,
+      type: 'image/jpg',
+      name: 'image.jpg',
+    });
+
+    fetch('http://89.139.10.158:5000/uploader', {
+      method: 'POST',
+      headers: {
+        contentType: "text/html; charset=utf-8",
+      },
+      body: form
+    })
+    .then((response) => {
+      console.log("recived")
+      console.log(response)
+      speakGreeting(response)
+    }).catch((error)=>{
+      console.error("Failed uploader")
+    });
+    console.log(newPhoto.uri)
+    
+    
+    setPhoto(undefined);
+  };
+
+  let recordVideo = () => {
+    setIsRecording(true);
+    let options = {
+      quality: "720p",
+      maxDuration: 5,
+      mute: false
+    };
+
+    cameraRef.current.recordAsync(options).then((recordedVideo) => {
+      setVideo(recordedVideo);
+    
+      console.log('Capturing video')
+      console.log(recordedVideo.uri)
       const form = new FormData();
 
       form.append('image', {
-        uri: newPhoto.uri,
+        uri: recordedVideo.uri,
         type: 'image/jpg',
         name: 'image.jpg',
       });
 
-      fetch('http://89.139.10.158:5000/uploader', {
+      fetch('http://89.139.10.158:5000/uploadervideo', {
         method: 'POST',
         headers: {
           contentType: "text/html; charset=utf-8",
@@ -87,52 +128,9 @@ export default function App() {
       }).catch((error)=>{
         console.error("Failed uploader")
       });
-      setPhoto(undefined);
-    });
     
-   
-  };
 
-  let recordVideo = () => {
-    setIsRecording(true);
-    let options = {
-      quality: "1080p",
-      maxDuration: 5,
-      mute: false
-    };
-
-    cameraRef.current.recordAsync(options).then((recordedVideo) => {
-      setVideo(recordedVideo);
-      
-      MediaLibrary.saveToLibraryAsync(recordedVideo.uri).then(() => {
-        
-
-        const form = new FormData();
-
-        form.append('image', {
-          uri: recordedVideo.uri,
-          type: 'image/jpg',
-          name: 'image.jpg',
-        });
-
-        fetch('http://89.139.10.158:5000/uploader', {
-          method: 'POST',
-          headers: {
-            contentType: "text/html; charset=utf-8",
-          },
-          body: form
-        })
-        .then((response) => {
-          console.log("recived")
-          console.log(response)
-          speakGreeting(response)
-        }).catch((error)=>{
-          console.error("Failed uploader")
-        });
-      
-
-        setVideo(undefined);
-      });
+      setVideo(undefined);
       
       setIsRecording(false);
     });
