@@ -1,8 +1,40 @@
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 
+import sys
+sys.path.append(r"C:\Users\omerm\AppData\Local\Programs\Python\Python38\include\Lib\site-packages")
 
+# Import required modules
+import numpy as np
+import cv2 as cv
+from cv2 import cuda
 
+cuda.printCudaDeviceInfo(0)
+import math
+#from dateutil.parser import parse
+import datetime as dt
+
+confThreshold = 0.5
+nmsThreshold = 0.4
+inpWidth = 960
+inpHeight = 960
+modelDetector = 'frozen_east_text_detection.pb'
+modelRecognition = 'crnn_cs.onnx'
+
+# Load network
+detector = cv.dnn.readNet(modelDetector)
+recognizer = cv.dnn.readNet(modelRecognition)
+detector.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+detector.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+recognizer.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+recognizer.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+# Create a new named window
+kWinName = "EAST: An Efficient and Accurate Scene Text Detector"
+# cv.namedWindow(kWinName, cv.WINDOW_NORMAL)
+outNames = []
+outNames.append("feature_fusion/Conv_7/Sigmoid")
+outNames.append("feature_fusion/concat_3")
+input = 'file.img1'
 
 '''
     Text detection model: https://github.com/argman/EAST
@@ -21,9 +53,10 @@ from werkzeug.utils import secure_filename
     torch.onnx.export(model, dummy_input, "crnn.onnx", verbose=True)
 '''
 
-import numpy as np # numjs
-import cv2 as cv # opencv-js
-import math
+'''
+crnn_cs.onnx: https://drive.google.com/uc?export=dowload&id=12diBsVJrS9ZEl6BNUiRp9s0xPALBS7kt
+frozen_east_text_detection: https://www.dropbox.com/s/r2ingd0l3zt8hxs/frozen_east_text_detection.tar.gz?dl=1
+'''
 
 ############ Utility functions ############
 
@@ -43,7 +76,8 @@ def fourPointsTransform(frame, vertices):
 
 def decodeText(scores):
     text = ""
-    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    with open('alphabet_94.txt', 'r') as file:
+        alphabet = file.read().replace('\n', '')
     for i in range(scores.shape[0]):
         c = np.argmax(scores[i][0])
         if c != 0:
@@ -102,8 +136,7 @@ def decodeBoundingBoxes(scores, geometry, scoreThresh):
             w = x1_data[x] + x3_data[x]
 
             # Calculate offset
-            offset = ([offsetX + cosA * x1_data[x] + sinA * x2_data[x],
-                      offsetY - sinA * x1_data[x] + cosA * x2_data[x]])
+            offset = ([offsetX + cosA * x1_data[x] + sinA * x2_data[x], offsetY - sinA * x1_data[x] + cosA * x2_data[x]])
 
             # Find points for rectangle
             p1 = (-sinA * h + offset[0], -cosA * h + offset[1])
@@ -115,34 +148,46 @@ def decodeBoundingBoxes(scores, geometry, scoreThresh):
     # Return detections and confidences
     return [detections, confidences]
 
+def is_date(string, fuzzy=False):
+    # """
+    # Return whether the string can be interpreted as a date.
+    #
+    # :param string: str, string to check for date
+    # :param fuzzy: bool, ignore unknown tokens in string if True
+    # """
+    # try:
+    #     parse(string, fuzzy=fuzzy)
+    #     return True
+    #
+    # except ValueError:
+    #     return False
+
+    formats = (
+    '%d %m %Y', '%d %b %Y', '%m %Y',
+    '%d/%m/%Y', '%d/%b/%y', '%m/%Y',
+    '%d.%m.%Y', '%d.%b.%Y', '%m.%Y')
+
+    for fmt in formats:
+        try:
+            t = dt.datetime.strptime(string, fmt)
+            return True
+        except ValueError as err:
+            return False
 
 def main():
-    # Read and store arguments
-    confThreshold = 0.5
-    nmsThreshold = 0.4
-    inpWidth = 320
-    inpHeight = 320
-    modelDetector = "frozen_east_text_detection.pb"
-    modelRecognition = "ResNet_CTC.onnx"
-    # Load network
-    detector = cv.dnn.readNet(modelDetector)
-    recognizer = cv.dnn.readNet(modelRecognition)
 
-    # Create a new named window
-    kWinName = "EAST: An Efficient and Accurate Scene Text Detector"
-    cv.namedWindow(kWinName, cv.WINDOW_NORMAL)
-    outNames = []
-    outNames.append("feature_fusion/Conv_7/Sigmoid")
-    outNames.append("feature_fusion/concat_3")
-    # Open a video file or an image file or a camera stream
-    cap = cv.VideoCapture("file.img1")
-
+    cap = cv.VideoCapture(input)
+    #cap = cv.VideoCapture(args.input if args.input else 0)
+    count = 0
     tickmeter = cv.TickMeter()
     while cv.waitKey(1) < 0:
         # Read frame
         hasFrame, frame = cap.read()
+        count += 1
+        # if count%24 != 0:
+        #     print(f'skipped {count}')
+        #     continue
         if not hasFrame:
-            cv.waitKey()
             break
 
         # Get frame height and width
@@ -152,8 +197,7 @@ def main():
         rH = height_ / float(inpHeight)
 
         # Create a 4D blob from frame.
-        blob = cv.dnn.blobFromImage(
-            frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
+        blob = cv.dnn.blobFromImage(frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
 
         # Run the detection model
         detector.setInput(blob)
@@ -165,15 +209,13 @@ def main():
         # Get scores and geometry
         scores = outs[0]
         geometry = outs[1]
-        [boxes, confidences] = decodeBoundingBoxes(
-            scores, geometry, confThreshold)
+        [boxes, confidences] = decodeBoundingBoxes(scores, geometry, confThreshold)
 
         # Apply NMS
-        indices = cv.dnn.NMSBoxesRotated(
-            boxes, confidences, confThreshold, nmsThreshold)
+        indices = cv.dnn.NMSBoxesRotated(boxes, confidences, confThreshold, nmsThreshold)   
         for i in indices:
             # get 4 corners of the rotated rect
-            vertices = cv.boxPoints(boxes[i])
+            vertices = cv.boxPoints(boxes[int(i)])
             # scale the bounding box coordinates based on the respective ratios
             for j in range(4):
                 vertices[j][0] *= rW
@@ -182,11 +224,10 @@ def main():
             # get cropped image using perspective transform
             if modelRecognition:
                 cropped = fourPointsTransform(frame, vertices)
-                cropped = cv.cvtColor(cropped, cv.COLOR_BGR2GRAY)
+                #cropped = cv.cvtColor(cropped, cv.COLOR_BGR2GRAY)
 
                 # Create a 4D blob from cropped image
-                blob = cv.dnn.blobFromImage(cropped, size=(
-                    100, 32), mean=127.5, scalefactor=1 / 127.5)
+                blob = cv.dnn.blobFromImage(cropped, size=(100, 32), mean=127.5, scalefactor=1 / 127.5)
                 recognizer.setInput(blob)
 
                 # Run the recognition model
@@ -199,21 +240,26 @@ def main():
                 cv.putText(frame, wordRecognized, (int(vertices[1][0]), int(vertices[1][1])), cv.FONT_HERSHEY_SIMPLEX,
                            0.5, (255, 0, 0))
 
+                print(wordRecognized)
+
+                if(wordRecognized=='14/06/2022'):
+                    import ipdb; ipdb.set_trace()
+                    print("Date rcognized: " + wordRecognized)
+
+
             for j in range(4):
                 p1 = (int(vertices[j][0]), int(vertices[j][1]))
-                p2 = (int(vertices[(j + 1) % 4][0]),
-                      int(vertices[(j + 1) % 4][1]))
-                cv.line(frame, p1, p2, (0, 255, 0), 10)
+                p2 = (int(vertices[(j + 1) % 4][0]), int(vertices[(j + 1) % 4][1]))
+                cv.line(frame, p1, p2, (0, 255, 0), 1)
 
         # Put efficiency information
         label = 'Inference time: %.2f ms' % (tickmeter.getTimeMilli())
-        cv.putText(frame, label, (0, 15),
-                   cv.FONT_HERSHEY_SIMPLEX, 14, (0, 255, 0))
+        print(label)
+        cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
 
         # Display the frame
-        cv.imshow(kWinName, frame)
+        # cv.imshow(kWinName, frame)
         tickmeter.reset()
-
 
 
 

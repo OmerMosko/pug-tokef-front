@@ -65,28 +65,28 @@ export default function App() {
     let newPhoto = await cameraRef.current.takePictureAsync(options);
     setPhoto(newPhoto);
     MediaLibrary.saveToLibraryAsync(newPhoto.uri).then(() => {
-      // const form = new FormData();
+      const form = new FormData();
 
-      // form.append('image', {
-      //   uri: newPhoto.uri,
-      //   type: 'image/jpg',
-      //   name: 'image.jpg',
-      // });
+      form.append('image', {
+        uri: newPhoto.uri,
+        type: 'image/jpg',
+        name: 'image.jpg',
+      });
 
-      // fetch('http://10.100.102.24:5000/uploader', {
-      //   method: 'POST',
-      //   headers: {
-      //     co ntentType: "text/html; charset=utf-8",
-      //   },
-      //   body: form
-      // })
-      // .then((response) => {
-      //   console.log("recived")
-      //   console.log(response)
-      //   speakGreeting(response)
-      // }).catch((error)=>{
-      //   console.error("Failed uploader")
-      // });
+      fetch('http://89.139.10.158:5000/uploader', {
+        method: 'POST',
+        headers: {
+          contentType: "text/html; charset=utf-8",
+        },
+        body: form
+      })
+      .then((response) => {
+        console.log("recived")
+        console.log(response)
+        speakGreeting(response)
+      }).catch((error)=>{
+        console.error("Failed uploader")
+      });
       setPhoto(undefined);
     });
     
@@ -103,6 +103,37 @@ export default function App() {
 
     cameraRef.current.recordAsync(options).then((recordedVideo) => {
       setVideo(recordedVideo);
+      
+      MediaLibrary.saveToLibraryAsync(recordedVideo.uri).then(() => {
+        
+
+        const form = new FormData();
+
+        form.append('image', {
+          uri: recordedVideo.uri,
+          type: 'image/jpg',
+          name: 'image.jpg',
+        });
+
+        fetch('http://89.139.10.158:5000/uploader', {
+          method: 'POST',
+          headers: {
+            contentType: "text/html; charset=utf-8",
+          },
+          body: form
+        })
+        .then((response) => {
+          console.log("recived")
+          console.log(response)
+          speakGreeting(response)
+        }).catch((error)=>{
+          console.error("Failed uploader")
+        });
+      
+
+        setVideo(undefined);
+      });
+      
       setIsRecording(false);
     });
   };
@@ -111,7 +142,9 @@ export default function App() {
     setIsRecording(false);
     cameraRef.current.stopRecording();
   };
-
+  let saveVideo = () => {
+    
+  };
   if (video) {
     let shareVideo = () => {
       shareAsync(video.uri).then(() => {
@@ -119,26 +152,22 @@ export default function App() {
       });
     };
 
-    let saveVideo = () => {
-      MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
-        setVideo(undefined);
-      });
-    };
+    
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <Video
-          style={styles.video}
-          source={{uri: video.uri}}
-          useNativeControls
-          resizeMode='contain'
-          isLooping
-        />
-        <Button title="Share" onPress={shareVideo} />
-        {hasMediaLibraryPermission ? <Button title="Save" onPress={saveVideo} /> : undefined}
-        <Button title="Discard" onPress={() => setVideo(undefined)} />
-      </SafeAreaView>
-    );
+    // return (
+    //   <SafeAreaView style={styles.container}>
+    //     <Video
+    //       style={styles.video}
+    //       source={{uri: video.uri}}
+    //       useNativeControls
+    //       resizeMode='contain'
+    //       isLooping
+    //     />
+    //     <Button title="Share" onPress={shareVideo} />
+    //     {hasMediaLibraryPermission ? <Button title="Save" onPress={saveVideo} /> : undefined}
+    //     <Button title="Discard" onPress={() => setVideo(undefined)} />
+    //   </SafeAreaView>
+    // );
   }
 
   if (photo) {
@@ -151,11 +180,20 @@ export default function App() {
     let savePhoto = () => {
       
     };
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <Image style={styles.preview} source={{ uri: "data:image/jpg;base64," + photo.base64 }} />
+        <Button title="Share" onPress={sharePic} />
+        {hasMediaLibraryPermission ? <Button title="Save" onPress={savePhoto} /> : undefined}
+        <Button title="Discard" onPress={() => setPhoto(undefined)} />
+      </SafeAreaView>
+    );
   }
 
   return (
     <>
-    <Camera style={styles.container} ref={cameraRef} onPress={takePic}>
+    <Camera style={styles.container} ref={cameraRef}>
       <View style={styles.buttonContainer}>
           <Button title="TakePic" onPress={takePic} />
           <Button title={isRecording ? "Stop Recording" : "Record Video"} onPress={isRecording ? stopRecording : recordVideo} />
