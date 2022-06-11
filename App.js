@@ -26,8 +26,8 @@ export default function App() {
   
   React.useEffect(listAllVoiceOptions);
   // Speech 
-  const speakGreeting = (name) => {
-    var greeting = "21.12.2022";
+  const speakGreeting = (date) => {
+    var greeting = date;
     const options = {
       voice: "com.apple.speech.synthesis.voice.Fred",
     };
@@ -81,9 +81,11 @@ export default function App() {
       body: form
     })
     .then((response) => {
-      console.log("recived")
-      console.log(response)
-      speakGreeting(response)
+      response.json().then((data) =>{
+        console.log("recived")
+        console.log(data)
+        speakGreeting(data.date)
+      })
     }).catch((error)=>{
       console.error("Failed uploader")
     });
@@ -122,9 +124,11 @@ export default function App() {
         body: form
       })
       .then((response) => {
-        console.log("recived")
-        console.log(response)
-        speakGreeting(response)
+        response.json().then((data) =>{
+          console.log("recived")
+          console.log(data)
+          speakGreeting(data.date)
+        })
       }).catch((error)=>{
         console.error("Failed uploader")
       });

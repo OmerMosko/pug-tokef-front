@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
+from flask import jsonify
+import logging
 
 import sys
 sys.path.append(r"C:\Users\omerm\AppData\Local\Programs\Python\Python38\include\Lib\site-packages")
@@ -149,30 +151,22 @@ def decodeBoundingBoxes(scores, geometry, scoreThresh):
     return [detections, confidences]
 
 def is_date(string, fuzzy=False):
-    # """
-    # Return whether the string can be interpreted as a date.
-    #
-    # :param string: str, string to check for date
-    # :param fuzzy: bool, ignore unknown tokens in string if True
-    # """
-    # try:
-    #     parse(string, fuzzy=fuzzy)
-    #     return True
-    #
-    # except ValueError:
-    #     return False
-
     formats = (
     '%d %m %Y', '%d %b %Y', '%m %Y',
-    '%d/%m/%Y', '%d/%b/%y', '%m/%Y',
-    '%d.%m.%Y', '%d.%b.%Y', '%m.%Y')
+    '%d/%m/%Y', '%d/%b/%Y', '%m/%Y',
+    '%d.%m.%Y', '%d.%b.%Y', '%m.%Y',
+    '%d %m %y', '%d %b %y', '%m %y',
+    '%d/%m/%y', '%d/%b/%y', '%m/%y',
+    '%d.%m.%y', '%d.%b.%y', '%m.%y'
+    )
 
     for fmt in formats:
         try:
             t = dt.datetime.strptime(string, fmt)
             return True
         except ValueError as err:
-            return False
+            err
+    return False
 
 def main(imput_file):
 
@@ -240,11 +234,14 @@ def main(imput_file):
                 cv.putText(frame, wordRecognized, (int(vertices[1][0]), int(vertices[1][1])), cv.FONT_HERSHEY_SIMPLEX,
                            0.5, (255, 0, 0))
 
-                print(wordRecognized)
+                app.logger.info(wordRecognized)
 
-                if(wordRecognized=='14/06/2022'):
-                    import ipdb; ipdb.set_trace()
-                    print("Date rcognized: " + wordRecognized)
+                if(is_date(wordRecognized)):
+                    dict = {'date': wordRecognized}
+                    app.logger.info("Date rcognized: " + wordRecognized)
+                    print("Date rcognized: " + wordRecognized, file=sys.stdout)
+                    return dict
+
 
 
             for j in range(4):
@@ -254,12 +251,13 @@ def main(imput_file):
 
         # Put efficiency information
         label = 'Inference time: %.2f ms' % (tickmeter.getTimeMilli())
-        print(label)
+        app.logger.info(label)
         cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
 
         # Display the frame
         # cv.imshow(kWinName, frame)
         tickmeter.reset()
+    return {'date': "Couldn't find date"}
 
 
 
@@ -276,16 +274,16 @@ def upload_file():
     if request.method == 'POST':
         f = request.files['image']
         f.save("file.jpg")
-        main("file.jpg")
-        return '21.12.2022'
+        dict = main("file.jpg")
+        return jsonify(dict)
 
 @app.route('/uploadervideo', methods = ['GET', 'POST'])
 def upload_video():
     if request.method == 'POST':
         f = request.files['image']
         f.save("file.mp4")
-        main("file.mp4")
-        return '21.12.2022'	
+        dict = main("file.mp4")
+        return jsonify(dict)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
